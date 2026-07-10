@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project outputs
+outputs/
+hf_model/
+data/
+Docs/
+test/
+train_val/
