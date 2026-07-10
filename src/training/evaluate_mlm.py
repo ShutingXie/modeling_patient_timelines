@@ -22,6 +22,7 @@ def evaluate_mlm(
     model.eval()
     total_loss = 0.0
     total_correct = 0
+    total_top5_correct = 0
     total_masked = 0
     n_batches = 0
 
@@ -62,11 +63,15 @@ def evaluate_mlm(
         if mask.any():
             preds = logits.argmax(dim=-1)
             total_correct += (preds[mask] == mlm_labels[mask]).sum().item()
+            top5 = logits[mask].topk(min(5, logits.size(-1)), dim=-1).indices
+            labels_at_mask = mlm_labels[mask].unsqueeze(-1)
+            total_top5_correct += (top5 == labels_at_mask).any(dim=-1).sum().item()
             total_masked += mask.sum().item()
 
     metrics: dict[str, Any] = {
         "mlm_loss": total_loss / max(n_batches, 1),
         "mlm_accuracy": total_correct / max(total_masked, 1),
+        "mlm_top5_accuracy": total_top5_correct / max(total_masked, 1),
         "n_masked_tokens": total_masked,
     }
     return metrics

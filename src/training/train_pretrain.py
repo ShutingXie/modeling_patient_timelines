@@ -133,7 +133,12 @@ def train_pretrain(
     best_metrics: dict[str, Any] = {}
     patience = pretrain_cfg.get("early_stopping_patience", 3)
     patience_counter = 0
-    history = {"train_mlm_loss": [], "pretrain_val_mlm_loss": [], "pretrain_val_mlm_accuracy": []}
+    history = {
+        "train_mlm_loss": [],
+        "pretrain_val_mlm_loss": [],
+        "pretrain_val_mlm_accuracy": [],
+        "pretrain_val_mlm_top5_accuracy": [],
+    }
 
     epochs = pretrain_cfg.get("epochs", 20)
     grad_clip = pretrain_cfg.get("gradient_clip_norm", 1.0)
@@ -188,10 +193,12 @@ def train_pretrain(
         val_metrics = evaluate_mlm(model, val_loader, device, loss_fn, use_amp=use_amp)
         val_loss = val_metrics["mlm_loss"]
         val_acc = val_metrics["mlm_accuracy"]
+        val_top5_acc = val_metrics["mlm_top5_accuracy"]
 
         history["train_mlm_loss"].append(train_loss)
         history["pretrain_val_mlm_loss"].append(val_loss)
         history["pretrain_val_mlm_accuracy"].append(val_acc)
+        history["pretrain_val_mlm_top5_accuracy"].append(val_top5_acc)
 
         scheduler.step(val_loss)
         log_dict = {
@@ -199,11 +206,13 @@ def train_pretrain(
             "train_mlm_loss": train_loss,
             "pretrain_val_mlm_loss": val_loss,
             "pretrain_val_mlm_accuracy": val_acc,
+            "pretrain_val_mlm_top5_accuracy": val_top5_acc,
             "lr": optimizer.param_groups[0]["lr"],
         }
         print(
             f"Pretrain epoch {epoch}/{epochs} | train_mlm_loss={train_loss:.4f} "
-            f"pretrain_val_mlm_loss={val_loss:.4f} pretrain_val_mlm_acc={val_acc:.4f}"
+            f"pretrain_val_mlm_loss={val_loss:.4f} pretrain_val_mlm_acc={val_acc:.4f} "
+            f"pretrain_val_mlm_top5_acc={val_top5_acc:.4f}"
         )
         if run is not None:
             import wandb
@@ -251,7 +260,8 @@ def _save_pretrain_curves(history: dict, path: Path) -> None:
         axes[0].plot(history["pretrain_val_mlm_loss"], label="pretrain_val")
         axes[0].set_title("MLM Loss")
         axes[0].legend()
-        axes[1].plot(history["pretrain_val_mlm_accuracy"], label="pretrain_val accuracy")
+        axes[1].plot(history["pretrain_val_mlm_accuracy"], label="top-1")
+        axes[1].plot(history["pretrain_val_mlm_top5_accuracy"], label="top-5")
         axes[1].set_title("MLM Accuracy")
         axes[1].legend()
         fig.tight_layout()
