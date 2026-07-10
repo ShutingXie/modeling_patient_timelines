@@ -13,17 +13,24 @@ sys.path.insert(0, str(ROOT))
 import pandas as pd
 
 from src.models.baselines import evaluate_baselines
-from src.utils.io import ensure_data_dir, load_config, load_json
+from src.utils.io import load_config, load_json, resolve_data_dir
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/baseline.yaml")
+    parser.add_argument(
+        "--data-dir",
+        default=None,
+        help="Override config data.data_dir (absolute path or relative to repo root)",
+    )
     args = parser.parse_args()
 
     config = load_config(ROOT / args.config)
     data_cfg = config["data"]
-    ensure_data_dir(ROOT / data_cfg["data_dir"], repo_root=ROOT)
+    if args.data_dir is not None:
+        config["data"]["data_dir"] = args.data_dir
+    resolve_data_dir(config, ROOT, data_dir_override=args.data_dir)
     processed_dir = ROOT / data_cfg["processed_dir"]
     metrics_dir = ROOT / "outputs/metrics"
     metrics_dir.mkdir(parents=True, exist_ok=True)

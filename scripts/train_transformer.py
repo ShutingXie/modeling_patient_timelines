@@ -11,17 +11,24 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.training.train_transformer import train_transformer
-from src.utils.io import ensure_data_dir, load_config
+from src.utils.io import load_config, resolve_data_dir
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/transformer.yaml")
     parser.add_argument("--no-wandb", action="store_true")
+    parser.add_argument(
+        "--data-dir",
+        default=None,
+        help="Override config data.data_dir (absolute path or relative to repo root)",
+    )
     args = parser.parse_args()
 
     config = load_config(ROOT / args.config)
-    ensure_data_dir(ROOT / config["data"]["data_dir"], repo_root=ROOT)
+    if args.data_dir is not None:
+        config["data"]["data_dir"] = args.data_dir
+    resolve_data_dir(config, ROOT, data_dir_override=args.data_dir)
     processed_dir = ROOT / config["data"]["processed_dir"]
 
     results = train_transformer(

@@ -31,17 +31,22 @@ from src.data.load_data import (
 )
 from src.data.vocab import Vocabulary
 from src.utils.checks import print_check_summary, run_preprocessing_checks
-from src.utils.io import ensure_data_dir, load_config, save_json
+from src.utils.io import load_config, resolve_data_dir, save_json
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/transformer.yaml")
+    parser.add_argument(
+        "--data-dir",
+        default=None,
+        help="Override config data.data_dir (absolute path or relative to repo root)",
+    )
     args = parser.parse_args()
 
     config = load_config(ROOT / args.config)
     data_cfg = config["data"]
-    data_dir = ensure_data_dir(ROOT / data_cfg["data_dir"], repo_root=ROOT)
+    data_dir = resolve_data_dir(config, ROOT, data_dir_override=args.data_dir)
     processed_dir = ROOT / data_cfg["processed_dir"]
     processed_dir.mkdir(parents=True, exist_ok=True)
 
