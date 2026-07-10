@@ -220,7 +220,7 @@ __marimo__/
 # Project outputs
 outputs/
 hf_model/
-data/
+/data/
 Docs/
 test/
 train_val/
