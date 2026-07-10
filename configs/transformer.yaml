@@ -42,3 +42,17 @@ wandb:
   project: ehr-timeline-transformer
   entity: null
   run_name: transformer_encoder_v1
+
+pretrain:
+  epochs: 20
+  batch_size: 32
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  mask_prob: 0.15
+  mask_token_prob: 0.8
+  random_token_prob: 0.1
+  early_stopping_patience: 3
+  gradient_clip_norm: 1.0
+  use_amp: true
+  split_frac_val: 0.1
+  split_seed: 42

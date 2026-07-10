@@ -60,6 +60,8 @@ def predict_test(
         num_modalities=len(modality_to_id),
         num_time_buckets=len(time_bucket_to_id),
         num_age_buckets=len(age_bucket_to_id),
+        include_mlm_head=False,
+        include_classifier=True,
     )
     model.load_state_dict(ckpt["model_state_dict"])
     model.to(device)
@@ -74,7 +76,7 @@ def predict_test(
         age_bucket_ids = batch["age_bucket_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
         logits = model(
-            input_ids, modality_ids, time_bucket_ids, age_bucket_ids, attention_mask
+            input_ids, modality_ids, time_bucket_ids, age_bucket_ids, attention_mask, task="cls"
         )
         probs = torch.sigmoid(logits).cpu().numpy()
         all_probs.append(probs)

@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 
 from src.data.dataset import load_json_mapping, load_processed_dataset
 from src.data.vocab import Vocabulary
+from src.models.checkpoint_utils import filter_finetune_state_dict, load_pretrained_encoder
 from src.models.transformer_encoder import build_model_from_config
 from src.training.evaluate import evaluate_model
 from src.utils.seed import set_seed
@@ -39,6 +40,7 @@ def train_transformer(
     metrics_dir: str | Path = "outputs/metrics",
     plots_dir: str | Path = "outputs/plots",
     use_wandb: bool = True,
+    pretrained_checkpoint: str | Path | None = None,
 ) -> dict[str, Any]:
     set_seed(config.get("seed", 42))
     processed_dir = Path(processed_dir)
@@ -83,7 +85,12 @@ def train_transformer(
         num_modalities=len(modality_to_id),
         num_time_buckets=len(time_bucket_to_id),
         num_age_buckets=len(age_bucket_to_id),
+        include_mlm_head=False,
+        include_classifier=True,
     ).to(device)
+
+    if pretrained_checkpoint is not None:
+        load_pretrained_encoder(model, pretrained_checkpoint, device=device)
 
     train_labels = pd.read_parquet(processed_dir / "train_labels.parquet")
     pos_weight = compute_pos_weights(
@@ -140,7 +147,12 @@ def train_transformer(
             if use_amp:
                 with torch.autocast(device_type="cuda"):
                     logits = model(
-                        input_ids, modality_ids, time_bucket_ids, age_bucket_ids, attention_mask
+                        input_ids,
+                        modality_ids,
+                        time_bucket_ids,
+                        age_bucket_ids,
+                        attention_mask,
+                        task="cls",
                     )
                     loss = loss_fn(logits, labels)
                 scaler.scale(loss).backward()
@@ -150,7 +162,12 @@ def train_transformer(
                 scaler.update()
             else:
                 logits = model(
-                    input_ids, modality_ids, time_bucket_ids, age_bucket_ids, attention_mask
+                    input_ids,
+                    modality_ids,
+                    time_bucket_ids,
+                    age_bucket_ids,
+                    attention_mask,
+                    task="cls",
                 )
                 loss = loss_fn(logits, labels)
                 loss.backward()
@@ -196,13 +213,14 @@ def train_transformer(
             best_metrics = val_metrics
             patience_counter = 0
             ckpt = {
-                "model_state_dict": model.state_dict(),
+                "model_state_dict": filter_finetune_state_dict(model.state_dict()),
                 "config": config,
                 "target_codes": target_codes,
                 "vocab_path": str(processed_dir / "vocab.json"),
                 "lab_binner_path": str(processed_dir / "lab_binner.json"),
                 "best_val_metrics": best_metrics,
                 "epoch": epoch,
+                "pretrained_from": str(pretrained_checkpoint) if pretrained_checkpoint else None,
             }
             torch.save(ckpt, checkpoint_dir / "best_model.pt")
         else:

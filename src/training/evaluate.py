@@ -37,11 +37,15 @@ def evaluate_model(
 
         if use_amp and device.type == "cuda":
             with torch.autocast(device_type="cuda"):
-                logits = model(input_ids, modality_ids, time_bucket_ids, age_bucket_ids, attention_mask)
+                logits = model(
+                    input_ids, modality_ids, time_bucket_ids, age_bucket_ids, attention_mask, task="cls"
+                )
                 if loss_fn is not None:
                     total_loss += loss_fn(logits, labels).item()
         else:
-            logits = model(input_ids, modality_ids, time_bucket_ids, age_bucket_ids, attention_mask)
+            logits = model(
+                input_ids, modality_ids, time_bucket_ids, age_bucket_ids, attention_mask, task="cls"
+            )
             if loss_fn is not None:
                 total_loss += loss_fn(logits, labels).item()
 

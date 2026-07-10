@@ -43,3 +43,17 @@ wandb:
   entity: null
   run_name: debug_smoke_test
   mode: disabled
+
+pretrain:
+  epochs: 1
+  batch_size: 16
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  mask_prob: 0.15
+  mask_token_prob: 0.8
+  random_token_prob: 0.1
+  early_stopping_patience: 3
+  gradient_clip_norm: 1.0
+  use_amp: true
+  split_frac_val: 0.2
+  split_seed: 42

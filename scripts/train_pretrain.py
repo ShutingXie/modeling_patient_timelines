@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train the transformer model."""
+"""Train MEM (Masked Event Modeling) pretraining."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.training.train_transformer import train_transformer
+from src.training.train_pretrain import train_pretrain
 from src.utils.io import load_config, resolve_data_dir
 
 
@@ -23,11 +23,6 @@ def main() -> None:
         default=None,
         help="Override config data.data_dir (absolute path or relative to repo root)",
     )
-    parser.add_argument(
-        "--pretrained-checkpoint",
-        default=None,
-        help="Path to pretrain_best.pt for encoder weight initialization",
-    )
     args = parser.parse_args()
 
     config = load_config(ROOT / args.config)
@@ -36,16 +31,15 @@ def main() -> None:
     resolve_data_dir(config, ROOT, data_dir_override=args.data_dir)
     processed_dir = ROOT / config["data"]["processed_dir"]
 
-    results = train_transformer(
+    results = train_pretrain(
         config=config,
         processed_dir=processed_dir,
         use_wandb=not args.no_wandb,
-        pretrained_checkpoint=args.pretrained_checkpoint,
     )
     best = results["best_val_metrics"]
     print(
-        f"\nBest validation: macro_auroc={best.get('macro_auroc')} "
-        f"mAP={best.get('mAP')}"
+        f"\nBest pretrain validation: mlm_loss={best.get('mlm_loss')} "
+        f"mlm_accuracy={best.get('mlm_accuracy')}"
     )
 
 
