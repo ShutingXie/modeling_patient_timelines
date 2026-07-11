@@ -1,0 +1,60 @@
+seed: 42
+
+data:
+  data_dir: data
+  processed_dir: outputs/processed
+  use_tables:
+    - conditions
+    - medications
+  max_seq_len: 128
+  min_token_freq: 2
+  lab_num_bins: 5
+  time_buckets_days: [30, 90, 180, 365, 730, 1825, 3650]
+  age_bucket_years: 5
+
+model:
+  d_model: 64
+  num_layers: 1
+  num_heads: 4
+  dim_feedforward: 256
+  dropout: 0.1
+  pooling: cls
+
+training:
+  batch_size: 16
+  epochs: 1
+  learning_rate: 0.0001
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+  early_stopping_patience: 1
+  pos_weight_clip: 20.0
+  use_amp: false
+  monitor_metric: val_map
+  use_param_groups: true
+  encoder_lr: 0.0001
+  classifier_lr: 0.0003
+  freeze_encoder_epochs: 1
+  encoder_dropout: 0.15
+  classifier_dropout: 0.25
+  checkpoint_name: best_model_reg_smoke.pt
+  metrics_name: val_metrics_reg_smoke.json
+
+wandb:
+  project: ehr-timeline-transformer
+  entity: null
+  run_name: debug_finetune_reg_smoke
+  mode: disabled
+
+pretrain:
+  epochs: 1
+  batch_size: 16
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  mask_prob: 0.15
+  mask_token_prob: 0.8
+  random_token_prob: 0.1
+  early_stopping_patience: 1
+  gradient_clip_norm: 1.0
+  use_amp: false
+  split_frac_val: 0.2
+  split_seed: 42

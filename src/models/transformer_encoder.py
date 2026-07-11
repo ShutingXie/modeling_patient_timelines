@@ -107,11 +107,13 @@ class PatientTimelineTransformer(nn.Module):
         num_heads: int = 8,
         dim_feedforward: int = 1024,
         dropout: float = 0.1,
+        classifier_dropout: float | None = None,
         max_seq_len: int = 1024,
         include_mlm_head: bool = False,
         include_classifier: bool = True,
     ):
         super().__init__()
+        head_dropout = classifier_dropout if classifier_dropout is not None else dropout
         self.encoder = PatientTimelineEncoder(
             vocab_size=vocab_size,
             num_modalities=num_modalities,
@@ -126,7 +128,9 @@ class PatientTimelineTransformer(nn.Module):
         )
         self.mlm_head = MLMHead(d_model, vocab_size, dropout=dropout) if include_mlm_head else None
         self.classifier = (
-            ClassificationHead(d_model, num_labels, dropout=dropout) if include_classifier else None
+            ClassificationHead(d_model, num_labels, dropout=head_dropout)
+            if include_classifier
+            else None
         )
         self._init_weights()
 
@@ -173,6 +177,10 @@ def build_model_from_config(
 ) -> PatientTimelineTransformer:
     model_cfg = config.get("model", config)
     data_cfg = config.get("data", config)
+    train_cfg = config.get("training", {})
+    encoder_dropout = train_cfg.get("encoder_dropout")
+    dropout = encoder_dropout if encoder_dropout is not None else model_cfg.get("dropout", 0.1)
+    classifier_dropout = train_cfg.get("classifier_dropout")
     return PatientTimelineTransformer(
         vocab_size=vocab_size,
         num_modalities=num_modalities,
@@ -183,7 +191,8 @@ def build_model_from_config(
         num_layers=model_cfg.get("num_layers", 4),
         num_heads=model_cfg.get("num_heads", 8),
         dim_feedforward=model_cfg.get("dim_feedforward", 1024),
-        dropout=model_cfg.get("dropout", 0.1),
+        dropout=dropout,
+        classifier_dropout=classifier_dropout,
         max_seq_len=data_cfg.get("max_seq_len", 1024),
         include_mlm_head=include_mlm_head,
         include_classifier=include_classifier,

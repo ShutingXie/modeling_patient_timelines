@@ -33,6 +33,59 @@ def compute_pos_weights(
     return torch.tensor(weights, dtype=torch.float32)
 
 
+def set_encoder_trainable(model: nn.Module, trainable: bool) -> None:
+    for name, param in model.named_parameters():
+        if name.startswith("encoder."):
+            param.requires_grad = trainable
+
+
+def build_finetune_optimizer(
+    model: nn.Module,
+    train_cfg: dict[str, Any],
+) -> torch.optim.Optimizer:
+    weight_decay = train_cfg.get("weight_decay", 0.01)
+    if not train_cfg.get("use_param_groups", False):
+        return torch.optim.AdamW(
+            model.parameters(),
+            lr=train_cfg.get("learning_rate", 3e-4),
+            weight_decay=weight_decay,
+        )
+
+    encoder_params = [p for n, p in model.named_parameters() if n.startswith("encoder.")]
+    classifier_params = [p for n, p in model.named_parameters() if n.startswith("classifier.")]
+    return torch.optim.AdamW(
+        [
+            {"params": encoder_params, "lr": train_cfg.get("encoder_lr", 1e-4)},
+            {"params": classifier_params, "lr": train_cfg.get("classifier_lr", 3e-4)},
+        ],
+        weight_decay=weight_decay,
+    )
+
+
+def _optimizer_lr_dict(optimizer: torch.optim.Optimizer) -> dict[str, float]:
+    lrs: dict[str, float] = {}
+    for i, group in enumerate(optimizer.param_groups):
+        key = "lr" if len(optimizer.param_groups) == 1 else f"lr_group_{i}"
+        lrs[key] = group["lr"]
+    if len(optimizer.param_groups) == 2:
+        lrs["encoder_lr"] = optimizer.param_groups[0]["lr"]
+        lrs["classifier_lr"] = optimizer.param_groups[1]["lr"]
+    return lrs
+
+
+def _regularization_metadata(train_cfg: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "freeze_encoder_epochs": train_cfg.get("freeze_encoder_epochs", 0),
+        "encoder_lr": train_cfg.get("encoder_lr"),
+        "classifier_lr": train_cfg.get("classifier_lr"),
+        "use_param_groups": train_cfg.get("use_param_groups", False),
+        "encoder_dropout": train_cfg.get("encoder_dropout"),
+        "classifier_dropout": train_cfg.get("classifier_dropout"),
+        "weight_decay": train_cfg.get("weight_decay", 0.01),
+        "early_stopping_patience": train_cfg.get("early_stopping_patience", 5),
+    }
+
+
 def train_transformer(
     config: dict[str, Any],
     processed_dir: str | Path,
@@ -98,11 +151,11 @@ def train_transformer(
     ).to(device)
     loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=train_cfg.get("learning_rate", 3e-4),
-        weight_decay=train_cfg.get("weight_decay", 0.01),
-    )
+    freeze_encoder_epochs = train_cfg.get("freeze_encoder_epochs", 0)
+    if freeze_encoder_epochs > 0:
+        set_encoder_trainable(model, False)
+
+    optimizer = build_finetune_optimizer(model, train_cfg)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="max", factor=0.5, patience=2
     )
@@ -130,8 +183,15 @@ def train_transformer(
     epochs = train_cfg.get("epochs", 50)
     grad_clip = train_cfg.get("gradient_clip_norm", 1.0)
     monitor = train_cfg.get("monitor_metric", "val_map")
+    checkpoint_name = train_cfg.get("checkpoint_name", "best_model.pt")
+    metrics_name = train_cfg.get("metrics_name", "val_metrics.json")
 
     for epoch in range(1, epochs + 1):
+        if freeze_encoder_epochs > 0:
+            encoder_frozen = epoch <= freeze_encoder_epochs
+            set_encoder_trainable(model, not encoder_frozen)
+            freeze_status = "frozen" if encoder_frozen else "unfrozen"
+            print(f"Epoch {epoch}/{epochs} | encoder {freeze_status}")
         model.train()
         epoch_loss = 0.0
         n_batches = 0
@@ -197,7 +257,7 @@ def train_transformer(
             "val_loss": val_loss,
             "val_macro_auroc": val_auroc,
             "val_map": val_map,
-            "lr": optimizer.param_groups[0]["lr"],
+            **_optimizer_lr_dict(optimizer),
         }
         print(
             f"Epoch {epoch}/{epochs} | train_loss={train_loss:.4f} "
@@ -221,15 +281,16 @@ def train_transformer(
                 "best_val_metrics": best_metrics,
                 "epoch": epoch,
                 "pretrained_from": str(pretrained_checkpoint) if pretrained_checkpoint else None,
+                "regularization": _regularization_metadata(train_cfg),
             }
-            torch.save(ckpt, checkpoint_dir / "best_model.pt")
+            torch.save(ckpt, checkpoint_dir / checkpoint_name)
         else:
             patience_counter += 1
             if patience_counter >= patience:
                 print(f"Early stopping at epoch {epoch}")
                 break
 
-    with open(metrics_dir / "val_metrics.json", "w") as f:
+    with open(metrics_dir / metrics_name, "w") as f:
         json.dump(best_metrics, f, indent=2)
 
     per_cond = pd.DataFrame(

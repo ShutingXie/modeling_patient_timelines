@@ -28,11 +28,48 @@ def main() -> None:
         default=None,
         help="Path to pretrain_best.pt for encoder weight initialization",
     )
+    parser.add_argument(
+        "--encoder-lr",
+        type=float,
+        default=None,
+        help="Override training.encoder_lr",
+    )
+    parser.add_argument(
+        "--classifier-lr",
+        type=float,
+        default=None,
+        help="Override training.classifier_lr",
+    )
+    parser.add_argument(
+        "--freeze-encoder-epochs",
+        type=int,
+        default=None,
+        help="Override training.freeze_encoder_epochs",
+    )
+    parser.add_argument(
+        "--early-stopping-patience",
+        type=int,
+        default=None,
+        help="Override training.early_stopping_patience",
+    )
     args = parser.parse_args()
 
     config = load_config(ROOT / args.config)
     if args.data_dir is not None:
         config["data"]["data_dir"] = args.data_dir
+
+    train_cfg = config.setdefault("training", {})
+    if args.encoder_lr is not None:
+        train_cfg["encoder_lr"] = args.encoder_lr
+        train_cfg["use_param_groups"] = True
+    if args.classifier_lr is not None:
+        train_cfg["classifier_lr"] = args.classifier_lr
+        train_cfg["use_param_groups"] = True
+    if args.freeze_encoder_epochs is not None:
+        train_cfg["freeze_encoder_epochs"] = args.freeze_encoder_epochs
+    if args.early_stopping_patience is not None:
+        train_cfg["early_stopping_patience"] = args.early_stopping_patience
+
     resolve_data_dir(config, ROOT, data_dir_override=args.data_dir)
     processed_dir = ROOT / config["data"]["processed_dir"]
 

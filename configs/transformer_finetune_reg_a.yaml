@@ -1,0 +1,65 @@
+seed: 42
+
+data:
+  data_dir: data
+  processed_dir: outputs/processed
+  use_tables:
+    - conditions
+    - medications
+    - procedures
+    - observations
+    - encounters
+    - immunizations
+    - careplans
+    - allergies
+    - devices
+  max_seq_len: 1024
+  min_token_freq: 2
+  lab_num_bins: 5
+  time_buckets_days: [30, 90, 180, 365, 730, 1825, 3650]
+  age_bucket_years: 5
+
+model:
+  d_model: 256
+  num_layers: 4
+  num_heads: 8
+  dim_feedforward: 1024
+  dropout: 0.1
+  pooling: cls
+
+training:
+  batch_size: 32
+  epochs: 50
+  learning_rate: 0.0001
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+  early_stopping_patience: 3
+  pos_weight_clip: 20.0
+  use_amp: true
+  monitor_metric: val_map
+
+  # Tier A only: config-based regularization, no code-path extras
+  use_param_groups: false
+  freeze_encoder_epochs: 0
+
+  checkpoint_name: best_model_reg_a.pt
+  metrics_name: val_metrics_reg_a.json
+
+wandb:
+  project: ehr-timeline-transformer
+  entity: null
+  run_name: colab_mem_finetune_reg_a_v1
+
+pretrain:
+  epochs: 20
+  batch_size: 32
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  mask_prob: 0.15
+  mask_token_prob: 0.8
+  random_token_prob: 0.1
+  early_stopping_patience: 3
+  gradient_clip_norm: 1.0
+  use_amp: true
+  split_frac_val: 0.1
+  split_seed: 42
