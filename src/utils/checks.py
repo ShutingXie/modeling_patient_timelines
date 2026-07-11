@@ -45,6 +45,24 @@ def check_events_before_anchor(events: pd.DataFrame, anchors: pd.DataFrame) -> d
     return _result("events_before_anchor", ok, f"violations={violations}")
 
 
+def check_conditions_present(
+    train_events: pd.DataFrame,
+    val_events: pd.DataFrame,
+    test_events: pd.DataFrame,
+) -> dict[str, Any]:
+    counts = {
+        "train": int((train_events["modality"] == "conditions").sum()),
+        "val": int((val_events["modality"] == "conditions").sum()),
+        "test": int((test_events["modality"] == "conditions").sum()),
+    }
+    passed = all(count > 0 for count in counts.values())
+    return _result(
+        "conditions_present",
+        passed,
+        f"train={counts['train']} val={counts['val']} test={counts['test']}",
+    )
+
+
 def check_labels(
     labels: pd.DataFrame,
     target_codes: list[str],
@@ -116,6 +134,7 @@ def run_preprocessing_checks(
         check_events_before_anchor(train_events, train_anchors),
         check_events_before_anchor(val_events, val_anchors),
         check_events_before_anchor(test_events, test_anchors),
+        check_conditions_present(train_events, val_events, test_events),
         check_labels(train_labels, target_codes, conditions_df, train_anchors),
         check_labels(val_labels, target_codes, conditions_df, val_anchors),
         _result("vocab_fit_train_only", True, "enforced in prepare_data.py"),

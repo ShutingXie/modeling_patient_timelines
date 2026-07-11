@@ -227,7 +227,8 @@ def _append_parquet(df: pd.DataFrame, path: Path, writer: pq.ParquetWriter | Non
     table = pa.Table.from_pandas(df, preserve_index=False)
     if writer is None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        return pq.ParquetWriter(path, table.schema)
+        writer = pq.ParquetWriter(path, table.schema)
+
     writer.write_table(table)
     return writer
 
